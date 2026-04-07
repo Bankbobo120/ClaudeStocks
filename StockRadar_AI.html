@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval';">
+<title>StockRadar AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060810;
+    --surface: #0d1117;
+    --surface2: #131923;
+    --border: #1e2a3a;
+    --accent: #00e5ff;
+    --accent2: #ff4f6d;
+    --accent3: #7fff6a;
+    --gold: #ffd23f;
+    --text: #e8f0fe;
+    --text-dim: #7a8fa6;
+    --up: #00e676;
+    --down: #ff3d5a;
+    --neutral: #ffd23f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BG grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 0 80px; }
+
+  /* HEADER */
+  .header {
+    padding: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #006eff);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+  .header-date { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--text-dim); text-align: right; }
+
+  /* HERO CARD */
+  .hero {
+    margin: 16px 20px;
+    background: linear-gradient(135deg, #0d1f35 0%, #0a1628 100%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, rgba(0,229,255,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+  .hero-title { font-size: 22px; font-weight: 800; line-height: 1.2; margin-bottom: 8px; }
+  .hero-sub { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 16px; }
+  .scan-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--accent) 0%, #006eff 100%);
+    border: none;
+    border-radius: 12px;
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .scan-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* FILTER TABS */
+  .filters {
+    padding: 16px 20px 0;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-tab {
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  /* SECTION */
+  .section-header {
+    padding: 20px 20px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section-title { font-size: 16px; font-weight: 700; }
+  .section-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  /* STOCK CARD */
+  .stock-list { padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  .stock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+    cursor: pointer;
+  }
+  .stock-card:active { transform: scale(0.99); }
+  .stock-card.bullish { border-left: 3px solid var(--up); }
+  .stock-card.bearish { border-left: 3px solid var(--down); }
+  .stock-card.neutral { border-left: 3px solid var(--neutral); }
+
+  .card-header {
+    padding: 14px 14px 10px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .card-left { display: flex; align-items: center; gap: 10px; }
+  .ticker-badge {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .card-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .card-sector { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  .card-right { text-align: right; flex-shrink: 0; }
+  .card-price { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; }
+  .card-change {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .neut { color: var(--neutral); }
+
+  /* INDICATORS ROW */
+  .indicators {
+    padding: 0 14px 10px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .indicator {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ind-bull { background: rgba(0,230,118,0.12); color: var(--up); border: 1px solid rgba(0,230,118,0.25); }
+  .ind-bear { background: rgba(255,61,90,0.12); color: var(--down); border: 1px solid rgba(255,61,90,0.25); }
+  .ind-neut { background: rgba(255,210,63,0.12); color: var(--neutral); border: 1px solid rgba(255,210,63,0.25); }
+
+  /* SIGNAL BAR */
+  .signal-bar {
+    margin: 0 14px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .signal-label { font-size: 11px; color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+  .signal-track {
+    flex: 1;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .signal-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s ease;
+  }
+  .signal-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* PREDICTION */
+  .prediction {
+    margin: 0 14px 12px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .pred-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .pred-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+  .pred-horizon {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    background: var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .pred-text { font-size: 12px; line-height: 1.5; color: var(--text); }
+  .pred-target {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+  }
+  .target-box {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .target-box.bull-box { background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.2); }
+  .target-box.bear-box { background: rgba(255,61,90,0.1); border: 1px solid rgba(255,61,90,0.2); }
+  .target-label { font-size: 9px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; }
+  .target-val { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; margin-top: 2px; }
+
+  /* EXPANDED DETAIL */
+  .card-detail { display: none; padding: 0 14px 14px; }
+  .card-detail.open { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .detail-item {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .detail-item-label { font-size: 10px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-item-val { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; margin-top: 3px; }
+
+  .ai-analysis {
+    background: linear-gradient(135deg, rgba(0,229,255,0.05), rgba(0,110,255,0.05));
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 8px;
+  }
+  .ai-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .ai-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+  .ai-text { font-size: 12px; line-height: 1.7; color: var(--text); }
+
+  /* LOADING */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(6,8,16,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .loading-overlay.active { display: flex; }
+  .loader-ring {
+    width: 60px; height: 60px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 15px; font-weight: 700; color: var(--text); }
+  .loading-sub { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--text-dim); text-align: center; padding: 0 40px; }
+  .loading-steps { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .loading-step {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.3s;
+  }
+  .loading-step.done { color: var(--up); }
+  .loading-step.active-step { color: var(--accent); }
+  .step-icon { width: 14px; text-align: center; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: rgba(13,17,23,0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    padding: 10px 0 20px;
+    display: flex;
+    justify-content: space-around;
+    z-index: 50;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 4px 20px;
+    border-radius: 10px;
+    transition: opacity 0.2s;
+  }
+  .nav-item.active .nav-icon { color: var(--accent); }
+  .nav-icon { font-size: 20px; color: var(--text-dim); transition: color 0.2s; }
+  .nav-label { font-size: 10px; color: var(--text-dim); font-weight: 600; }
+  .nav-item.active .nav-label { color: var(--accent); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; line-height: 1.6; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%; transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* SCORE BADGE */
+  .score-badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .score-bull { background: rgba(0,230,118,0.15); color: var(--up); border: 2px solid var(--up); }
+  .score-bear { background: rgba(255,61,90,0.15); color: var(--down); border: 2px solid var(--down); }
+  .score-neut { background: rgba(255,210,63,0.15); color: var(--neutral); border: 2px solid var(--neutral); }
+
+  /* Animations */
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  .stagger-1 { animation-delay: 0.05s; opacity: 0; }
+  .stagger-2 { animation-delay: 0.1s; opacity: 0; }
+  .stagger-3 { animation-delay: 0.15s; opacity: 0; }
+  .stagger-4 { animation-delay: 0.2s; opacity: 0; }
+  .stagger-5 { animation-delay: 0.25s; opacity: 0; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loading-text">🔍 Analyse en cours...</div>
+  <div class="loading-steps" id="loadingSteps">
+    <div class="loading-step" id="step1"><span class="step-icon">⏳</span> Sélection des 10 actions...</div>
+    <div class="loading-step" id="step2"><span class="step-icon">⏳</span> Lecture des indicateurs techniques...</div>
+    <div class="loading-step" id="step3"><span class="step-icon">⏳</span> Analyse RSI, MACD, MM50/200...</div>
+    <div class="loading-step" id="step4"><span class="step-icon">⏳</span> Génération des prédictions IA...</div>
+    <div class="loading-step" id="step5"><span class="step-icon">⏳</span> Calcul des scores de confiance...</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">📡</div>
+      <div class="logo-text">Stock<span>Radar</span></div>
+    </div>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-label">Propulsé par IA</div>
+    <div class="hero-title">10 Actions à<br>Surveiller Aujourd'hui</div>
+    <div class="hero-sub">Analyse technique complète : RSI, MACD, MM50/200, Volume, Fondamentaux. Prédictions court & moyen terme.</div>
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">
+      <span>⚡</span> Lancer l'Analyse IA
+    </button>
+  </div>
+
+  <div class="filters" id="filterBar" style="display:none">
+    <button class="filter-tab active" onclick="filterStocks('tous', this)">Tous</button>
+    <button class="filter-tab" onclick="filterStocks('haussier', this)">📈 Haussier</button>
+    <button class="filter-tab" onclick="filterStocks('baissier', this)">📉 Baissier</button>
+    <button class="filter-tab" onclick="filterStocks('court', this)">⚡ Court terme</button>
+    <button class="filter-tab" onclick="filterStocks('moyen', this)">📅 Moyen terme</button>
+  </div>
+
+  <div id="mainContent">
+    <div class="empty-state">
+      <div class="empty-icon">🎯</div>
+      <div class="empty-title">Prêt à scanner le marché</div>
+      <div class="empty-sub">Lance l'analyse pour obtenir 10 actions sélectionnées et analysées par l'IA avec des prédictions concrètes.</div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <div class="nav-icon">📡</div>
+    <div class="nav-label">Radar</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">⭐</div>
+    <div class="nav-label">Favoris</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">📊</div>
+    <div class="nav-label">Marché</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">⚙️</div>
+    <div class="nav-label">Réglages</div>
+  </div>
+</div>
+
+<script>
+const CLAUDE_API = "https://claude-stocks-6awg.vercel.app/api/stockradar"
+let allStocks = [];
+let currentFilter = 'tous';
+
+// Date
+const now = new Date();
+document.getElementById('headerDate').innerHTML =
+  now.toLocaleDateString('fr-FR', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) +
+  '<br>' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+async function animateSteps() {
+  const steps = ['step1','step2','step3','step4','step5'];
+  const delays = [0, 800, 1800, 3000, 4500];
+  for (let i = 0; i < steps.length; i++) {
+    await new Promise(r => setTimeout(r, delays[i]));
+    const el = document.getElementById(steps[i]);
+    if (el) {
+      // mark previous as done
+      if (i > 0) {
+        const prev = document.getElementById(steps[i-1]);
+        if (prev) { prev.classList.remove('active-step'); prev.classList.add('done'); prev.querySelector('.step-icon').textContent = '✅'; }
+      }
+      el.classList.add('active-step');
+      el.querySelector('.step-icon').textContent = '⚡';
+    }
+  }
+}
+
+async function startScan() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+
+  // Reset loading steps
+  ['step1','step2','step3','step4','step5'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { el.className = 'loading-step'; el.querySelector('.step-icon').textContent = '⏳'; }
+  });
+
+  document.getElementById('loadingOverlay').classList.add('active');
+  animateSteps();
+
+  try {
+    const today = new Date().toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+    const prompt = `Tu es un analyste financier expert. Nous sommes le ${today}.
+
+Sélectionne exactement 10 actions cotées sur NYSE ou NASDAQ qui méritent attention AUJOURD'HUI.
+Mélange : actions à fort potentiel haussier ET actions à risque de baisse.
+Couvre différents secteurs : tech, santé, énergie, consommation, finance.
+
+Pour CHAQUE action, réponds UNIQUEMENT en JSON valide (pas de texte avant/après) :
+
+{
+  "stocks": [
+    {
+      "ticker": "AAPL",
+      "nom": "Apple Inc.",
+      "secteur": "Technologie",
+      "prix": "185.50",
+      "variation_jour": "+1.2",
+      "signal": "haussier",
+      "horizon": "court",
+      "score_confiance": 78,
+      "rsi": "58.3",
+      "macd": "haussier",
+      "mm50_vs_mm200": "au-dessus",
+      "volume": "normal",
+      "catalyseur": "Lancement produit attendu + résultats solides",
+      "risque_principal": "Tensions commerciales USA-Chine",
+      "prediction_court": "Hausse probable vers 190-195$ dans les 5-7 jours si le marché reste stable",
+      "prediction_moyen": "Consolidation attendue à 180-200$ sur 3-4 semaines avant le prochain mouvement",
+      "cible_hausse": "195.00",
+      "cible_baisse": "178.00",
+      "resume_ia": "Apple affiche un momentum technique solide avec RSI en zone neutre-positive. Le MACD vient de croiser à la hausse sur le daily. Les volumes confirment l'intérêt institutionnel. Attention cependant aux tensions commerciales qui pourraient peser à court terme.",
+      "emoji_secteur": "💻"
+    }
+  ]
+}
+
+Règles strictes :
+- signal : exactement "haussier", "baissier" ou "neutre"
+- horizon dominant : "court" ou "moyen"
+- score_confiance : entre 40 et 92
+- Prix et cibles réalistes pour avril 2026
+- variation_jour : avec + ou - devant (ex: "+2.3" ou "-1.8")
+- Exactement 10 actions
+- JSON UNIQUEMENT, aucun texte autour`;
+
+    const response = await fetch(CLAUDE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error('API error: ' + response.status);
+    const data = await response.json();
+
+    // Mark last step done
+    const lastStep = document.getElementById('step5');
+    if(lastStep) { lastStep.classList.remove('active-step'); lastStep.classList.add('done'); lastStep.querySelector('.step-icon').textContent = '✅'; }
+
+    await new Promise(r => setTimeout(r, 600));
+
+    let rawText = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    // Clean JSON
+    rawText = rawText.replace(/```json|```/g, '').trim();
+    const jsonStart = rawText.indexOf('{');
+    const jsonEnd = rawText.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('JSON introuvable');
+    const parsed = JSON.parse(rawText.substring(jsonStart, jsonEnd + 1));
+
+    allStocks = parsed.stocks;
+    renderStocks(allStocks);
+    document.getElementById('filterBar').style.display = 'flex';
+    showToast('✅ 10 actions analysées avec succès !');
+
+  } catch (err) {
+    console.error(err);
+    showToast('❌ Erreur : ' + err.message, 4000);
+    renderFallback();
+  } finally {
+    document.getElementById('loadingOverlay').classList.remove('active');
+    btn.disabled = false;
+  }
+}
+
+function getTickerColor(signal) {
+  if (signal === 'haussier') return 'linear-gradient(135deg, #003d1a, #00261a)';
+  if (signal === 'baissier') return 'linear-gradient(135deg, #3d0010, #260008)';
+  return 'linear-gradient(135deg, #2d2600, #1a1800)';
+}
+
+function getSignalColor(signal) {
+  if (signal === 'haussier') return 'var(--up)';
+  if (signal === 'baissier') return 'var(--down)';
+  return 'var(--neutral)';
+}
+
+function buildIndicators(stock) {
+  const items = [];
+  // RSI
+  const rsi = parseFloat(stock.rsi);
+  if (!isNaN(rsi)) {
+    let cls = 'ind-neut', lbl = `RSI ${stock.rsi}`;
+    if (rsi > 65) { cls = 'ind-bear'; lbl = `RSI ${stock.rsi} ⚠`; }
+    else if (rsi < 40) { cls = 'ind-bull'; lbl = `RSI ${stock.rsi} 💡`; }
+    else { cls = 'ind-neut'; }
+    items.push(`<span class="indicator ${cls}">${lbl}</span>`);
+  }
+  // MACD
+  if (stock.macd) {
+    const cls = stock.macd === 'haussier' ? 'ind-bull' : stock.macd === 'baissier' ? 'ind-bear' : 'ind-neut';
+    items.push(`<span class="indicator ${cls}">MACD ${stock.macd}</span>`);
+  }
+  // MM
+  if (stock.mm50_vs_mm200) {
+    const cls = stock.mm50_vs_mm200 === 'au-dessus' ? 'ind-bull' : 'ind-bear';
+    const lbl = stock.mm50_vs_mm200 === 'au-dessus' ? 'MM50 > MM200 ✅' : 'Death Cross ⚠';
+    items.push(`<span class="indicator ${cls}">${lbl}</span>`);
+  }
+  // Volume
+  if (stock.volume) {
+    const cls = stock.volume === 'élevé' ? 'ind-bull' : 'ind-neut';
+    items.push(`<span class="indicator ${cls}">Vol. ${stock.volume}</span>`);
+  }
+  return items.join('');
+}
+
+function renderStocks(stocks) {
+  const container = document.getElementById('mainContent');
+  if (!stocks || stocks.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Aucune action</div></div>';
+    return;
+  }
+
+  let html = `
+    <div class="section-header">
+      <div class="section-title">Actions Sélectionnées</div>
+      <div class="section-count">${stocks.length} / 10</div>
+    </div>
+    <div class="stock-list" id="stockList">
+  `;
+
+  stocks.forEach((s, i) => {
+    const signalClass = s.signal === 'haussier' ? 'bullish' : s.signal === 'baissier' ? 'bearish' : 'neutral';
+    const varNum = parseFloat(s.variation_jour);
+    const varClass = varNum > 0 ? 'up' : varNum < 0 ? 'down' : 'neut';
+    const varPrefix = varNum > 0 ? '+' : '';
+    const scoreClass = s.score_confiance >= 65 ? 'score-bull' : s.score_confiance <= 45 ? 'score-bear' : 'score-neut';
+    const signalFillColor = s.signal === 'haussier' ? 'var(--up)' : s.signal === 'baissier' ? 'var(--down)' : 'var(--neutral)';
+    const horizonLabel = s.horizon === 'court' ? '⚡ Court terme' : '📅 Moyen terme';
+    const staggerClass = i < 5 ? `stagger-${Math.min(i+1, 5)}` : '';
+
+    html += `
+    <div class="stock-card ${signalClass} fade-in ${staggerClass}" id="card-${i}" onclick="toggleDetail(${i})">
+      <div class="card-header">
+        <div class="card-left">
+          <div class="ticker-badge" style="background:${getTickerColor(s.signal)}; color:${getSignalColor(s.signal)}; border: 1px solid ${getSignalColor(s.signal)}40">
+            ${s.emoji_secteur || '📊'}<br>${s.ticker}
+          </div>
+          <div>
+            <div class="card-name">${s.nom}</div>
+            <div class="card-sector">${s.secteur} · ${horizonLabel}</div>
+          </div>
+        </div>
+        <div class="card-right">
+          <div class="card-price">$${s.prix}</div>
+          <div class="card-change ${varClass}">${varPrefix}${s.variation_jour}%</div>
+        </div>
+      </div>
+
+      <div class="indicators">${buildIndicators(s)}</div>
+
+      <div class="signal-bar">
+        <div class="signal-label">Confiance</div>
+        <div class="signal-track">
+          <div class="signal-fill" style="width:${s.score_confiance}%; background:${signalFillColor}"></div>
+        </div>
+        <div class="signal-value" style="color:${signalFillColor}">${s.score_confiance}%</div>
+      </div>
+
+      <div class="prediction">
+        <div class="pred-header">
+          <div class="pred-label">🎯 Prédiction</div>
+          <div class="pred-horizon">${horizonLabel}</div>
+        </div>
+        <div class="pred-text">${s.signal === 'haussier' ? s.prediction_court : s.prediction_moyen}</div>
+        <div class="pred-target">
+          <div class="target-box bull-box">
+            <div class="target-label">🎯 Cible ↑</div>
+            <div class="target-val up">$${s.cible_hausse}</div>
+          </div>
+          <div class="target-box bear-box">
+            <div class="target-label">🛑 Stop ↓</div>
+            <div class="target-val down">$${s.cible_baisse}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-detail" id="detail-${i}">
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-item-label">Catalyseur</div>
+            <div class="detail-item-val" style="font-size:11px;font-family:Syne,sans-serif;font-weight:600;line-height:1.4">${s.catalyseur}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-item-label">Risque Principal</div>
+            <div class="detail-item-val" style="font-size:11px;font-family:Syne,sans-serif;font-weight:600;line-height:1.4">${s.risque_principal}</div>
+          </div>
+        </div>
+        <div class="ai-analysis">
+          <div class="ai-label"><div class="ai-dot"></div> Analyse IA Complète</div>
+          <div class="ai-text">${s.resume_ia}</div>
+          <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,229,255,0.1)">
+            <div style="font-size:10px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Prédiction moyen terme</div>
+            <div class="ai-text">${s.prediction_moyen}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function toggleDetail(index) {
+  const detail = document.getElementById(`detail-${index}`);
+  if (detail) detail.classList.toggle('open');
+}
+
+function filterStocks(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  let filtered = allStocks;
+  if (filter === 'haussier') filtered = allStocks.filter(s => s.signal === 'haussier');
+  else if (filter === 'baissier') filtered = allStocks.filter(s => s.signal === 'baissier');
+  else if (filter === 'court') filtered = allStocks.filter(s => s.horizon === 'court');
+  else if (filter === 'moyen') filtered = allStocks.filter(s => s.horizon === 'moyen');
+
+  renderStocks(filtered);
+}
+
+function renderFallback() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">Connexion requise</div>
+      <div class="empty-sub">L'analyse IA nécessite une connexion internet. Vérifie ta connexion et réessaie.</div>
+    </div>`;
+}
+</script>
+</body>
+</html>
